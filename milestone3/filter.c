@@ -17,18 +17,25 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #define IIR_A_COEFFICIENT_COUNT 10
 #define IIR_B_COEFFICIENT_COUNT 11
 
+#define FILTER_FREQUENCY_COUNT 10
+
 #define FILTER_IIR_FILTER_COUNT 10
 #define Z_QUEUE_SIZE 10
-#define X_Y_QUEUE_SIZE 81
-#define Z_QUEUE_SIZE IIR_A_COEFFICIENT_COUNT
-#define OUTPUT_QUEUE_SIZE 2000
+#define X_QUEUE_SIZE 81
+#define Y_QUEUE_SIZE 11
+#define OUTPUT_QUEUE_SIZE 10
 
+#define OUTPUT_INSIDE_QUEUE_SIZE 2001
+
+#define FIR_FILTER_TAP_COUNT 81
 #define POWER_VALUES 10
+
+#define DECIMATION_VALUE 10
 
 static queue_t zQueue[FILTER_IIR_FILTER_COUNT];	
 static queue_t outputQueue[OUTPUT_QUEUE_SIZE];
-static queue_t xQueue[X_Y_QUEUE_SIZE];
-static queue_t yQueue[X_Y_QUEUE_SIZE];
+static queue_t xQueue;
+static queue_t yQueue;
 
 static double currentPowerValue[POWER_VALUES];
 
@@ -119,33 +126,32 @@ const static double firCoefficients[FIR_FILTER_TAP_COUNT] = {
 -2.3389030995116655e-22};
 
 const static double iirACoefficientConstants[FILTER_FREQUENCY_COUNT][IIR_A_COEFFICIENT_COUNT] = {
-{1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00, 1.0000000000000000e+00},
-{-4.6377947119071443e+00, -3.0591317915750960e+00, -1.4071749185996747e+00, 8.2010906117760141e-01, 2.7080869856154512e+00, 4.9479835250075892e+00, 6.1701893352279846e+00, 7.4092912870072398e+00, 8.5743055776347692e+00},
-{1.3502215749461572e+01, 8.6417489609637634e+00, 5.6904141470697471e+00, 5.1673756579268559e+00, 7.8319071217995688e+00, 1.4691607003177602e+01, 2.0127225876810336e+01, 2.6857944460290135e+01, 3.4306584753117889e+01},
-{-2.6155952405269755e+01, -1.4278790253808875e+01, -5.7374718273676217e+00, 3.2580350909220819e+00, 1.2201607990980744e+01, 2.9082414772101060e+01, 4.2974193398071684e+01, 6.1578787811202247e+01, 8.4035290411037053e+01},
-{3.8589668330738348e+01, 2.1302268283304372e+01, 1.1958028362868873e+01, 1.0392903763919172e+01, 1.8651500443681620e+01, 4.3179839108869331e+01, 6.5958045321253451e+01, 9.8258255839887312e+01, 1.3928510844056814e+02},
-{-4.3038990303252632e+01, -2.2193853972079314e+01, -8.5435280598354382e+00, 4.8101776408668879e+00, 1.8758157568004549e+01, 4.8440791644688879e+01, 7.5230437667866596e+01, 1.1359460153696298e+02, 1.6305115418161620e+02},
-{3.7812927599537133e+01, 2.0873499791105537e+01, 1.1717345583835918e+01, 1.0183724507092480e+01, 1.8276088095999022e+01, 4.2310703962394342e+01, 6.4630411355739852e+01, 9.6280452143026082e+01, 1.3648147221895786e+02},
-{-2.5113598088113793e+01, -1.3709764520609468e+01, -5.5088290876998407e+00, 3.1282000712126603e+00, 1.1715361303018897e+01, 2.7923434247706432e+01, 4.1261591079244127e+01, 5.9124742025776392e+01, 8.0686288623299745e+01},
-{1.2703182701888094e+01, 8.1303553577932188e+00, 5.3536787286077372e+00, 4.8615933365571822e+00, 7.3684394621253499e+00, 1.3822186510471010e+01, 1.8936128791950534e+01, 2.5268527576524203e+01, 3.2276361903872115e+01},
-{-4.2755083391143520e+00, -2.8201643879900726e+00, -1.2972519209655518e+00, 7.5604535083144497e-01, 2.4965418284511904e+00, 4.5614664160654357e+00, 5.6881982915180291e+00, 6.8305064480743081e+00, 7.9045143816244696e+00}
+{-5.9637727070164015e+00, 1.9125339333078248e+01, -4.0341474540744173e+01, 6.1537466875368821e+01, -7.0019717951472188e+01, 6.0298814235238872e+01, -3.8733792862566290e+01, 1.7993533279581058e+01, -5.4979061224867651e+00, 9.0332828533799547e-01},
+{-4.6377947119071443e+00, 1.3502215749461572e+01, -2.6155952405269755e+01, 3.8589668330738348e+01, -4.3038990303252632e+01, 3.7812927599537133e+01, -2.5113598088113793e+01, 1.2703182701888094e+01, -4.2755083391143520e+00, 9.0332828533800291e-01},
+{-3.0591317915750960e+00, 8.6417489609637634e+00, -1.4278790253808875e+01, 2.1302268283304372e+01, -2.2193853972079314e+01, 2.0873499791105537e+01, -1.3709764520609468e+01, 8.1303553577932188e+00, -2.8201643879900726e+00, 9.0332828533800769e-01},
+{-1.4071749185996747e+00, 5.6904141470697471e+00, -5.7374718273676217e+00, 1.1958028362868873e+01, -8.5435280598354382e+00, 1.1717345583835918e+01, -5.5088290876998407e+00, 5.3536787286077372e+00, -1.2972519209655518e+00, 9.0332828533799414e-01},
+{8.2010906117760141e-01, 5.1673756579268559e+00, 3.2580350909220819e+00, 1.0392903763919172e+01, 4.8101776408668879e+00, 1.0183724507092480e+01, 3.1282000712126603e+00, 4.8615933365571822e+00, 7.5604535083144497e-01, 9.0332828533799658e-01},
+{2.7080869856154512e+00, 7.8319071217995688e+00, 1.2201607990980744e+01, 1.8651500443681620e+01, 1.8758157568004549e+01, 1.8276088095999022e+01, 1.1715361303018897e+01, 7.3684394621253499e+00, 2.4965418284511904e+00, 9.0332828533800436e-01},
+{4.9479835250075892e+00, 1.4691607003177602e+01, 2.9082414772101060e+01, 4.3179839108869331e+01, 4.8440791644688879e+01, 4.2310703962394342e+01, 2.7923434247706432e+01, 1.3822186510471010e+01, 4.5614664160654357e+00, 9.0332828533799958e-01},
+{6.1701893352279846e+00, 2.0127225876810336e+01, 4.2974193398071684e+01, 6.5958045321253451e+01, 7.5230437667866596e+01, 6.4630411355739852e+01, 4.1261591079244127e+01, 1.8936128791950534e+01, 5.6881982915180291e+00, 9.0332828533799803e-01},
+{7.4092912870072398e+00, 2.6857944460290135e+01, 6.1578787811202247e+01, 9.8258255839887312e+01, 1.1359460153696298e+02, 9.6280452143026082e+01, 5.9124742025776392e+01, 2.5268527576524203e+01, 6.8305064480743081e+00, 9.0332828533799969e-01},
+{8.5743055776347692e+00, 3.4306584753117889e+01, 8.4035290411037053e+01, 1.3928510844056814e+02, 1.6305115418161620e+02, 1.3648147221895786e+02, 8.0686288623299745e+01, 3.2276361903872115e+01, 7.9045143816244696e+00, 9.0332828533799636e-01}
 };
 
 const static double iirBCoefficientConstants[FILTER_FREQUENCY_COUNT][IIR_B_COEFFICIENT_COUNT] = {
-{9.0928532700696364e-10, 9.0928698045638776e-10, 9.0928689298097020e-10, 9.0928696329154157e-10, 9.0928648497937087e-10, 9.0928645119506948e-10, 9.0928343368482748e-10, 9.0929508683806034e-10, 9.0926783827278939e-10, 9.0906302220838671e-10},
-{-0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, -0.0000000000000000e+00, -0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00},
-{-4.5464266350348181e-09, -4.5464349022819393e-09, -4.5464344649048510e-09, -4.5464348164577090e-09, -4.5464324248968538e-09, -4.5464322559753479e-09, -4.5464171684241375e-09, -4.5464754341903021e-09, -4.5463391913639461e-09, -4.5453151110419338e-09},
-{-0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, -0.0000000000000000e+00, -0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00},
-{9.0928532700696362e-09, 9.0928698045638787e-09, 9.0928689298097020e-09, 9.0928696329154180e-09, 9.0928648497937076e-09, 9.0928645119506958e-09, 9.0928343368482750e-09, 9.0929508683806042e-09, 9.0926783827278922e-09, 9.0906302220838675e-09},
-{-0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, -0.0000000000000000e+00, -0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00},
-{-9.0928532700696362e-09, -9.0928698045638787e-09, -9.0928689298097020e-09, -9.0928696329154180e-09, -9.0928648497937076e-09, -9.0928645119506958e-09, -9.0928343368482750e-09, -9.0929508683806042e-09, -9.0926783827278922e-09, -9.0906302220838675e-09},
-{-0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, -0.0000000000000000e+00, -0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00},
-{4.5464266350348181e-09, 4.5464349022819393e-09, 4.5464344649048510e-09, 4.5464348164577090e-09, 4.5464324248968538e-09, 4.5464322559753479e-09, 4.5464171684241375e-09, 4.5464754341903021e-09, 4.5463391913639461e-09, 4.5453151110419338e-09},
-{-0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, -0.0000000000000000e+00, -0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00, 0.0000000000000000e+00}
+{9.0928532700696364e-10, -0.0000000000000000e+00, -4.5464266350348181e-09, -0.0000000000000000e+00, 9.0928532700696362e-09, -0.0000000000000000e+00, -9.0928532700696362e-09, -0.0000000000000000e+00, 4.5464266350348181e-09, -0.0000000000000000e+00, -9.0928532700696364e-10},
+{9.0928698045638776e-10, 0.0000000000000000e+00, -4.5464349022819393e-09, 0.0000000000000000e+00, 9.0928698045638787e-09, 0.0000000000000000e+00, -9.0928698045638787e-09, 0.0000000000000000e+00, 4.5464349022819393e-09, 0.0000000000000000e+00, -9.0928698045638776e-10},
+{9.0928689298097020e-10, 0.0000000000000000e+00, -4.5464344649048510e-09, 0.0000000000000000e+00, 9.0928689298097020e-09, 0.0000000000000000e+00, -9.0928689298097020e-09, 0.0000000000000000e+00, 4.5464344649048510e-09, 0.0000000000000000e+00, -9.0928689298097020e-10},
+{9.0928696329154157e-10, 0.0000000000000000e+00, -4.5464348164577090e-09, 0.0000000000000000e+00, 9.0928696329154180e-09, 0.0000000000000000e+00, -9.0928696329154180e-09, 0.0000000000000000e+00, 4.5464348164577090e-09, 0.0000000000000000e+00, -9.0928696329154157e-10},
+{9.0928648497937087e-10, 0.0000000000000000e+00, -4.5464324248968538e-09, 0.0000000000000000e+00, 9.0928648497937076e-09, 0.0000000000000000e+00, -9.0928648497937076e-09, 0.0000000000000000e+00, 4.5464324248968538e-09, 0.0000000000000000e+00, -9.0928648497937087e-10},
+{9.0928645119506948e-10, -0.0000000000000000e+00, -4.5464322559753479e-09, -0.0000000000000000e+00, 9.0928645119506958e-09, -0.0000000000000000e+00, -9.0928645119506958e-09, -0.0000000000000000e+00, 4.5464322559753479e-09, -0.0000000000000000e+00, -9.0928645119506948e-10},
+{9.0928343368482748e-10, -0.0000000000000000e+00, -4.5464171684241375e-09, -0.0000000000000000e+00, 9.0928343368482750e-09, -0.0000000000000000e+00, -9.0928343368482750e-09, -0.0000000000000000e+00, 4.5464171684241375e-09, -0.0000000000000000e+00, -9.0928343368482748e-10},
+{9.0929508683806034e-10, 0.0000000000000000e+00, -4.5464754341903021e-09, 0.0000000000000000e+00, 9.0929508683806042e-09, 0.0000000000000000e+00, -9.0929508683806042e-09, 0.0000000000000000e+00, 4.5464754341903021e-09, 0.0000000000000000e+00, -9.0929508683806034e-10},
+{9.0926783827278939e-10, 0.0000000000000000e+00, -4.5463391913639461e-09, 0.0000000000000000e+00, 9.0926783827278922e-09, 0.0000000000000000e+00, -9.0926783827278922e-09, 0.0000000000000000e+00, 4.5463391913639461e-09, 0.0000000000000000e+00, -9.0926783827278939e-10},
+{9.0906302220838671e-10, 0.0000000000000000e+00, -4.5453151110419338e-09, 0.0000000000000000e+00, 9.0906302220838675e-09, 0.0000000000000000e+00, -9.0906302220838675e-09, 0.0000000000000000e+00, 4.5453151110419338e-09, 0.0000000000000000e+00, -9.0906302220838671e-10}
 };
 
 #define FILTER_SAMPLE_FREQUENCY_IN_KHZ 100
-#define FILTER_FREQUENCY_COUNT 10
 #define FILTER_FIR_DECIMATION_FACTOR                                           \
   10 // FIR-filter needs this many new inputs to compute a new output.
 #define FILTER_INPUT_PULSE_WIDTH                                               \
@@ -170,6 +176,36 @@ static const uint16_t filter_frequencyTickTable[FILTER_FREQUENCY_COUNT] = {
 ****************************************** Main Filter Functions
 ******************************************
 **********************************************************************************************************/
+void initXQueue() {
+    queue_init(&(xQueue), X_QUEUE_SIZE, "x_queue");
+for (uint32_t j=0; j<X_QUEUE_SIZE; j++)
+     queue_overwritePush(&(xQueue), 0.0);
+}
+void initYQueue() {
+    queue_init(&(yQueue), Y_QUEUE_SIZE, "y_queue");
+for (uint32_t i=0; i<Y_QUEUE_SIZE; i++)
+     queue_overwritePush(&(yQueue), 0.0);
+}
+void initOutputQueues() {
+  for (uint32_t i=0; i<FILTER_IIR_FILTER_COUNT; i++) {
+    queue_init(&(outputQueue[i]), OUTPUT_INSIDE_QUEUE_SIZE, "output");
+    for (uint32_t j=0; j<OUTPUT_INSIDE_QUEUE_SIZE; j++)
+     queue_overwritePush(&(outputQueue[i]), 0.0);
+  }
+}
+
+void initZQueues() {
+  for (uint32_t i=0; i<FILTER_IIR_FILTER_COUNT; i++) {
+    queue_init(&(zQueue[i]), Z_QUEUE_SIZE, "z_output");
+    for (uint32_t j=0; j<Z_QUEUE_SIZE; j++)
+     queue_overwritePush(&(zQueue[i]), 0.0);
+    }
+}
+void initCurrentPowerQueue() {
+    for (uint32_t j=0; j<POWER_VALUES; j++)
+     currentPowerValue[j] = 0.0;
+}
+
 
 // Must call this prior to using any filter functions.
 void filter_init() {
@@ -178,43 +214,12 @@ void filter_init() {
   initYQueue();  // Call queue_init() on yQueue and fill it with zeros.
   initZQueues(); // Call queue_init() on all of the zQueues and fill each z queue with zeros.
   initOutputQueues();  // Call queue_init() all of the outputQueues and fill each outputQueue with zeros.
-
-}
-
-void initCurrentPowerQueue() {
-    for (uint32_t j=0; j<POWER_VALUES; j++)
-     queue_overwritePush(&(currentPowerValue[j]), 0.0);
-  }
-}
-void initXQueue() {
-for (uint32_t j=0; j<X_Y_QUEUE_SIZE; j++)
-     queue_overwritePush(&(xQueue[j]), 0.0);
-  }
-}
-void initYQueue() {
-for (uint32_t i=0; i<X_Y_QUEUE_SIZE; i++)
-     queue_overwritePush(&(yQueue[i]), 0.0);
-  }
-}
-void initOutputQueues() {
-  for (uint32_t i=0; i<FILTER_IIR_FILTER_COUNT; i++) {
-    queue_init(&(outputQueue[i]), Z_QUEUE_SIZE);
-    for (uint32_t j=0; j<Z_QUEUE_SIZE; j++)
-     queue_overwritePush(&(outputQueue[i]), 0.0);
-  }
-}
-
-void initZQueues() {
-  for (uint32_t i=0; i<FILTER_IIR_FILTER_COUNT; i++) {
-    queue_init(&(zQueue[i]), Z_QUEUE_SIZE);
-    for (uint32_t j=0; j<Z_QUEUE_SIZE; j++)
-     queue_overwritePush(&(zQueue[i]), 0.0);
-  }
+  initCurrentPowerQueue();
 }
 
 // Use this to copy an input into the input queue of the FIR-filter (xQueue).
 void filter_addNewInput(double x) {
-    xQueue.queue_push(xQueue, x);
+    queue_overwritePush(&xQueue, x);
 }
 
 // Fills a queue with the given fillValue. For example,
@@ -222,39 +227,38 @@ void filter_addNewInput(double x) {
 // after executing this function, the queue will contain 10 values
 // all of them 1.0.
 void filter_fillQueue(queue_t *q, double fillValue) {
-    for(uint32_t i = 0; i < size_t(q); i++) {
-        q[i] = fillValue;
-    }
+    for(uint32_t i = 0; i < queue_size(q); i++)
+        queue_overwritePush(q, fillValue);
 }
 
 // Invokes the FIR-filter. Input is contents of xQueue.
 // Output is returned and is also pushed on to yQueue.
 double filter_firFilter() {
-    double y = 0;
-    for(uint32_t i = 0; i < FIR_COEF_COUNT; i++) {
-        y += queue_readElementAt(&xQueue, FIR_COEF_COUNT - i - 1) * firCoefficients[i];
+    double y = 0.0;
+    for(uint32_t i = 0; i < X_QUEUE_SIZE; i++) {
+        y += queue_readElementAt(&xQueue, X_QUEUE_SIZE - i - 1) * firCoefficients[i];
     }
     return y;
 }
 
 // Use this to invoke a single iir filter. Input comes from yQueue.
-// Output is returned and is also pushed onto zQueue[filterNumber].
+// Output is returned and is also ed onto zQueue[filterNumber].
 double filter_iirFilter(uint16_t filterNumber) {
-    double y_values = 0;
-    double z_values = 0;
-    for(uint32_t i = 0; i < IIR_B_COEFFICIENT_COUNT; i++) {
-        y_values += queue_readElementAt(&yQueue, IIR_B_COEFFICIENT_COUNT - i - 1) * iirBCoefficientConstants[filterNumber][i];
+    double y_values = 0.0;
+    double z_values = 0.0;
+    for(uint32_t i = 0; i < Y_QUEUE_SIZE; i++) {
+        y_values += queue_readElementAt(&yQueue, Y_QUEUE_SIZE - i - 1) * iirBCoefficientConstants[filterNumber][i];
     }
-    for(uint32_t i = 0; i < IIR_A_COEFFICIENT_COUNT; i++) {
-        z_values += queue_readElementAt(&zQueue, IIR_A_COEFFICIENT_COUNT - i - 1) * iirACoefficientConstants[filterNumber][i];
+    for(uint32_t i = 0; i < Z_QUEUE_SIZE; i++) {
+        z_values += queue_readElementAt(&(zQueue[filterNumber]), Z_QUEUE_SIZE - i - 1) * iirACoefficientConstants[filterNumber][i];
     }
-    zQueue[filterNumber] = y_values - z_values;
-    return zQueue[filterNumber];
+    queue_overwritePush(&(zQueue[filterNumber]), y_values - z_values);
+    return y_values - z_values;
 }
 
 void initOutputQueuesPower() {
   for (uint32_t i=0; i<FILTER_IIR_FILTER_COUNT; i++) {
-    queue_init(&(outputQueue[i]), Z_QUEUE_SIZE);
+    queue_init(&(outputQueue[i]), Z_QUEUE_SIZE, "z_queue");
     for (uint32_t j=0; j<Z_QUEUE_SIZE; j++)
      queue_overwritePush(&(outputQueue[i]), 0.0);
   }
@@ -276,13 +280,18 @@ void initOutputQueuesPower() {
 double filter_computePower(uint16_t filterNumber, bool forceComputeFromScratch,
                            bool debugPrint) {
 if(forceComputeFromScratch) {
-    for(uint32_t i = 0; i < size(outputQueue[filterNumber]); i++) {
-        currentPowerValue[filterNumber] += pow(outputQueue[filterNumber][i], 2);
+    currentPowerValue[filterNumber] = 0;
+    for(uint32_t i = 1; i < OUTPUT_INSIDE_QUEUE_SIZE; i++) {
+        double value = queue_readElementAt(&(outputQueue[filterNumber]), i);
+        currentPowerValue[filterNumber] += (value * value);
         }
 }
 else {
-    currentPowerValue[filterNumber] += (pow(outputQueue[0], 2) - pow(outputQueue[OUTPUT_QUEUE_SIZE - 1], 2));
+    double oldValue = queue_readElementAt(&(outputQueue[filterNumber]), 0);
+    double newValue = queue_readElementAt(&(outputQueue[filterNumber]), OUTPUT_INSIDE_QUEUE_SIZE - 1);
+    currentPowerValue[filterNumber] += ((newValue * newValue) - (oldValue * oldValue));
     }
+return currentPowerValue[filterNumber];
 }
 
 // Returns the last-computed output power value for the IIR filter
@@ -297,7 +306,7 @@ double filter_getCurrentPowerValue(uint16_t filterNumber) {
 // detector. Remember that when you pass an array into a C function, changes to
 // the array within that function are reflected in the returned array.
 void filter_getCurrentPowerValues(double powerValues[]) {
-    return currentPowerValue;
+    powerValues = currentPowerValue;
 }
 
 // Using the previously-computed power values that are current stored in
@@ -306,7 +315,7 @@ void filter_getCurrentPowerValues(double powerValues[]) {
 // normalizedArray by the maximum power value contained in currentPowerValue[].
 void filter_getNormalizedPowerValues(double normalizedArray[],
                                      uint16_t *indexOfMaxValue) {
-    for(uint32_t i = 0; i < size(currentPowerValue); i++) {
+    for(uint32_t i = 0; i < POWER_VALUES; i++) {
         normalizedArray[i] = currentPowerValue[i] / (currentPowerValue[*indexOfMaxValue]);
     }
 
@@ -328,7 +337,7 @@ const double *filter_getFirCoefficientArray() {
 
 // Returns the number of FIR coefficients.
 uint32_t filter_getFirCoefficientCount() {
-    return size(firCoefficients);
+    return FIR_FILTER_TAP_COUNT;
 }
 
 // Returns the array of coefficients for a particular filter number.
@@ -338,7 +347,7 @@ const double *filter_getIirACoefficientArray(uint16_t filterNumber) {
 
 // Returns the number of A coefficients.
 uint32_t filter_getIirACoefficientCount() {
-    return size(iirACoefficientConstants);
+    return IIR_A_COEFFICIENT_COUNT;
 }
 
 // Returns the array of coefficients for a particular filter number.
@@ -349,17 +358,17 @@ const double *filter_getIirBCoefficientArray(uint16_t filterNumber) {
 
 // Returns the number of B coefficients.
 uint32_t filter_getIirBCoefficientCount() {
-    return size(iirBCoefficientConstants);
+    return IIR_B_COEFFICIENT_COUNT;
 }
 
 // Returns the size of the yQueue.
 uint32_t filter_getYQueueSize() {
-    return size(yQueue);
+    return Y_QUEUE_SIZE;
 }
 
 // Returns the decimation value.
 uint16_t filter_getDecimationValue() {
-    
+    return DECIMATION_VALUE;
 }
 
 // Returns the address of xQueue.
@@ -382,6 +391,6 @@ queue_t *filter_getIirOutputQueue(uint16_t filterNumber) {
     return &outputQueue[filterNumber];
 }
 
-// void filter_runTest();
+//void filter_runTest();
 
 #endif /* FILTER_H_ */
