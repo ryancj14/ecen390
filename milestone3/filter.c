@@ -13,6 +13,7 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #include "queue.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #define IIR_A_COEFFICIENT_COUNT 10
 #define IIR_B_COEFFICIENT_COUNT 11
@@ -25,7 +26,7 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #define Y_QUEUE_SIZE 11
 #define OUTPUT_QUEUE_SIZE 10
 
-#define OUTPUT_INSIDE_QUEUE_SIZE 2001
+#define OUTPUT_INSIDE_QUEUE_SIZE 2000
 
 #define FIR_FILTER_TAP_COUNT 81
 #define POWER_VALUES 10
@@ -238,6 +239,7 @@ double filter_firFilter() {
     for(uint32_t i = 0; i < X_QUEUE_SIZE; i++) {
         y += queue_readElementAt(&xQueue, X_QUEUE_SIZE - i - 1) * firCoefficients[i];
     }
+    queue_overwritePush(&yQueue, y);
     return y;
 }
 
@@ -279,18 +281,20 @@ void initOutputQueuesPower() {
 // array to keep track of these values for each of the 10 output queues.
 double filter_computePower(uint16_t filterNumber, bool forceComputeFromScratch,
                            bool debugPrint) {
+    static double oldValues[POWER_VALUES] = {0};
 if(forceComputeFromScratch) {
     currentPowerValue[filterNumber] = 0;
-    for(uint32_t i = 1; i < OUTPUT_INSIDE_QUEUE_SIZE; i++) {
+    for(uint32_t i = 0; i < OUTPUT_INSIDE_QUEUE_SIZE; i++) {
         double value = queue_readElementAt(&(outputQueue[filterNumber]), i);
         currentPowerValue[filterNumber] += (value * value);
         }
 }
 else {
-    double oldValue = queue_readElementAt(&(outputQueue[filterNumber]), 0);
     double newValue = queue_readElementAt(&(outputQueue[filterNumber]), OUTPUT_INSIDE_QUEUE_SIZE - 1);
-    currentPowerValue[filterNumber] += ((newValue * newValue) - (oldValue * oldValue));
+    currentPowerValue[filterNumber] += ((newValue * newValue) - (oldValues[filterNumber] * oldValues[filterNumber]));
     }
+
+    oldValues[filterNumber] = queue_readElementAt(&(outputQueue[filterNumber]), 0);
 return currentPowerValue[filterNumber];
 }
 
@@ -306,19 +310,34 @@ double filter_getCurrentPowerValue(uint16_t filterNumber) {
 // detector. Remember that when you pass an array into a C function, changes to
 // the array within that function are reflected in the returned array.
 void filter_getCurrentPowerValues(double powerValues[]) {
-    powerValues = currentPowerValue;
+    for(uint32_t i = 0; i < POWER_VALUES; i++)
+        powerValues[i] = currentPowerValue[i];
 }
 
 // Using the previously-computed power values that are current stored in
 // currentPowerValue[] array, Copy these values into the normalizedArray[]
 // argument and then normalize them by dividing all of the values in
 // normalizedArray by the maximum power value contained in currentPowerValue[].
+
+// void filter_getNormalizedPowerValues(double normalizedArray[], uint16_t* indexOfMaxValue){
+//     uint32_t arraySize = sizeof(currentPowerValue)/sizeof(currentPowerValue[0]); //theoretically gets array size
+//     for(uint32_t i = 0; i < arraySize; i++){
+//         normalizedArray[i] = currentPowerValue[i]; //copies into the normalized array.
+//     }
+//     uint16_t maxValue = *indexOfMaxValue; //possibly &indexOfMaxValue? to get real value?
+//     for(uint32_t i = 0; i < arraySize; i++){
+//         normalizedArray[i] = normalizedArray[i]/maxValue; //normalizes by dividing each by the maxValue.
+//     }
+// }
 void filter_getNormalizedPowerValues(double normalizedArray[],
                                      uint16_t *indexOfMaxValue) {
     for(uint32_t i = 0; i < POWER_VALUES; i++) {
         normalizedArray[i] = currentPowerValue[i] / (currentPowerValue[*indexOfMaxValue]);
     }
-
+    printf("Index of max value: %d\n", indexOfMaxValue);
+    printf("Normalized array: \n");
+    for(uint32_t i = 0; i < POWER_VALUES; i++) 
+        printf("%d ", normalizedArray[i]);
 }
 
 /*********************************************************************************************************
