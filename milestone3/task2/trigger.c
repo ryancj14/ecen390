@@ -6,12 +6,24 @@ form, to other persons or other institutions. Users may modify and use the
 source code for personal or educational use.
 For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 */
-
 #include <stdint.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include "trigger.h"
+#include "utils.h"
+#include "transmitter.h"
+#include "buttons.h"
+#include "switches.h"
 
+#define BTN1_MASK 0x0002
 // The trigger state machine debounces both the press and release of gun
 // trigger. Ultimately, it will activate the transmitter when a debounced press
 // is detected.
+
+#define TRIGGER_GUN_TRIGGER_MIO_PIN 10
+
+#define TRIGGER_TEST_TICK_PERIOD_IN_MS 50 //???? idk
+#define GUN_TRIGGER_PRESSED 1
 
 #define INIT_ST_MSG "Init state\n"
 #define WAIT_FOR_PRESS_ST_MSG "Wait for press state\n"
@@ -21,13 +33,13 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 
 #define ADC_MAX_VALUE 5000
 
-uint32_t adcCounter;
+static uint32_t adcCounter;
 typedef uint16_t trigger_shotsRemaining_t;
-
-trigger_shotsRemaining_t shotsRemaining;
-bool isEnabled;
-bool debugPrint;
-enum trigger_st_t {
+static bool ignoreGunInput;
+static trigger_shotsRemaining_t shotsRemaining;
+static bool isEnabled;
+static bool debugPrint;
+static enum trigger_st_t {
 	init_st,                 // Start here, transition out of this state on the first tick.
 	wait_for_press_st,
     debounce_press_st,
@@ -41,12 +53,16 @@ enum trigger_st_t {
 void trigger_init() {
     debugPrint = false;
     isEnabled = false;
+
     shotsRemaining = 0;
     adcCounter = 0;
     mio_setPinAsInput(TRIGGER_GUN_TRIGGER_MIO_PIN);
   // If the trigger is pressed when trigger_init() is called, assume that the gun is not connected and ignore it.
-  if (triggerPressed()) {
+  if (trigger_triggerPressed()) {
     ignoreGunInput = true;
+  }
+  else {
+    ignoreGunInput = false;
   }
 }
 
@@ -58,6 +74,9 @@ void trigger_enable() {
     isEnabled = true;
 }
 
+bool trigger_isRunning() {
+  return isEnabled;
+}
 // Disable the trigger state machine so that trigger presses are ignored.
 void trigger_disable() {
     isEnabled = false;
@@ -91,7 +110,7 @@ void trigger_debugStatePrint() {
         printf(DEBOUNCE_PRESS_ST_MSG);
         break;
       case wait_for_release_st:
-        printf(WAIT_FOR_release_ST_MSG);
+        printf(WAIT_FOR_RELEASE_ST_MSG);
         break;
       case debounce_release_st:
         printf(DEBOUNCE_RELEASE_ST_MSG);
@@ -99,8 +118,8 @@ void trigger_debugStatePrint() {
      }
   }
 }
-bool triggerPressed() {
-	return ((!ignoreGunInput & (mio_readPin(TRIGGER_GUN_TRIGGER_MIO_PIN) == GUN_TRIGGER_PRESSED)) || 
+bool trigger_triggerPressed() {
+	return ((!ignoreGunInput && (mio_readPin(TRIGGER_GUN_TRIGGER_MIO_PIN) == GUN_TRIGGER_PRESSED)) || 
                 (buttons_read() & BUTTONS_BTN0_MASK));
 }
 
@@ -116,7 +135,7 @@ void trigger_tick() {
             currentState = wait_for_press_st;
         break;
       case wait_for_press_st:
-      if(triggerPressed()) {
+      if(trigger_triggerPressed()) {
           currentState = debounce_press_st;
       }
       else {
@@ -124,7 +143,7 @@ void trigger_tick() {
       }
         break;
       case debounce_press_st:
-        if(adcCounter >= ADC_MAX_VALUE && triggerPressed()) {
+        if(adcCounter >= ADC_MAX_VALUE && trigger_triggerPressed()) {
             adcCounter = 0;
             currentState = wait_for_release_st;
             transmitter_run();
@@ -138,7 +157,7 @@ void trigger_tick() {
         }
         break;
       case wait_for_release_st:
-        if(!triggerPressed()) {
+        if(!trigger_triggerPressed()) {
             currentState = debounce_release_st;
         }
         else {
@@ -146,7 +165,7 @@ void trigger_tick() {
         }
         break;
       case debounce_release_st:
-      if(adcCounter >= ADC_MAX_VALUE && triggerPressed()) {
+      if(adcCounter >= ADC_MAX_VALUE && trigger_triggerPressed()) {
             adcCounter = 0;
             shotsRemaining--;
             if(debugPrint)
@@ -195,14 +214,14 @@ printf("starting trigger_runTest()\n\r");
   transmitter_init();
   trigger_debugStatePrint();                           // Prints diagnostics to stdio.
   while (!(buttons_read() & BTN1_MASK)) {                 // Run continuously until btn1 is pressed.
-    trigger_run();                                    // Start the transmitter.
-    while (trigger_running()) {                       // Keep ticking until it is done.
+                                     // Start the transmitter (run)
+    while (trigger_isRunning()) {                       // Keep ticking until it is done.
       trigger_tick();                                 // tick.
       utils_msDelay(TRIGGER_TEST_TICK_PERIOD_IN_MS);  // short delay between ticks.
     }
     printf("completed one test period.\n\r");
   }
-  transmitter_disableTestMode();
+  trigger_disableTestMode();
   printf("exiting trigger_runTest()\n\r");
 }
 

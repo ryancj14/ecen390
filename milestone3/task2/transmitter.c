@@ -13,6 +13,8 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #include <stdint.h>
 #include "filter.h"
 
+#include "transmitter.h"
+
 // The transmitter state machine generates a square wave output at the chosen
 // frequency as set by transmitter_setFrequencyNumber(). The step counts for the
 // frequencies are provided in filter.h
@@ -75,7 +77,6 @@ void transmitter_setFrequencyNumber(uint16_t frequencyNumber) {
     if (!isEnabled || isContinuous) 
     {
         frequencyValue = frequencyNumber;
-        freqUpdated = true;
     }
     else {
         storedFrequencyValue = frequencyNumber;
@@ -246,5 +247,3 @@ void transmitter_runNoncontinuousTest() {}
 // in response to changes to the changes in the slide switches.
 // Test runs until BTN1 is pressed.
 void transmitter_runContinuousTest() {}
-
-#endif /* TRANSMITTER_H_ */
