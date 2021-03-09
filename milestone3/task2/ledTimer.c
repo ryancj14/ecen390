@@ -54,6 +54,7 @@ cycleCounter = 0;
 mio_setPinAsOutput(LEDTIMER_OUTPUT_PIN);
 }
 
+//debug print for the ledTimer
 void ledTimer_debugStatePrint() {
   static enum ledTimer_st_t previousState;
   static bool firstPass = true;
@@ -118,13 +119,16 @@ void ledTimer_controlHitLed(bool flag) {
 
 // Standard state-machine tick function. Call this to advance the state machine.
 void ledTimer_tick() {
+  //debug print statements
   if(debugPrint)
     ledTimer_debugStatePrint();
+    //transitions for the ledTimer
 switch(led_currentState) {
       case init_st:
         led_currentState = wait_st;
         break;
       case wait_st:
+      //timer start flag 
         if(timerStartFlag) {
             cycleCounter = 0;
             led_currentState = lit_st;
@@ -135,6 +139,7 @@ switch(led_currentState) {
         }
         break;
       case lit_st:
+      //if the cycleCounter is higher than the max, then set to low
         if(cycleCounter > LED_CYCLES) {
             cycleCounter = 0;
             led_currentState = wait_st;
@@ -158,7 +163,6 @@ switch(led_currentState) {
       case wait_st:
         break;
       case lit_st:
-
         cycleCounter++;
         break;
     default:
@@ -171,6 +175,7 @@ switch(led_currentState) {
 // Standard test function.
 void ledTimer_runTest() {
   debugPrint = true;
+  //continuous loop for the run test
 while(true) {
     ledTimer_start();
         while(ledTimer_isRunning()) {

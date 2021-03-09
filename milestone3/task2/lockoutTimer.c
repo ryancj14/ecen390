@@ -17,6 +17,9 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 
 #include "lockoutTimer.h"
 
+#define START_LOCKOUT_TIMER "completed one test period.\n\r"
+#define LOCKOUT_TIMER_VALUE "Lockout Timer Test: %f seconds\n"
+#define LOCKOUT_TIMER_FAIL "failed to initialize intervalTimer 0\n"
 #define ERROR_MSG "Lockout Timer Error\n"
 #define INIT_ST_MSG "Init st\n"
 #define WAIT_ST_MSG "Wait state\n"
@@ -79,13 +82,16 @@ bool lockoutTimer_running() {
 
 // Standard tick function.
 void lockoutTimer_tick() {
+  //if the debug print statements are enabled, print 
   if(debugPrint)
     lockoutTimer_debugStatePrint();
+    //transitions for the state machien
 switch(lockout_currentState) {
       case init_st:
         lockout_currentState = wait_st;
         break;
       case wait_st:
+      //if the timerstartflag is enabled, then run
         if(timerStartFlag) {
             cycleCounter = 0;
             lockout_currentState = run_st;
@@ -95,6 +101,7 @@ switch(lockout_currentState) {
         }
         break;
       case run_st:
+      //if the counter reaches max, then wait again
         if(cycleCounter > LED_CYCLES) {
             lockout_currentState = wait_st;
             timerStartFlag = false;
@@ -105,7 +112,6 @@ switch(lockout_currentState) {
         break;
     default:
         printf(ERROR_MSG);
-        printf("Current state in Lockout: %d\n", lockout_currentState);
       // print an error message here.
       break;
   }
@@ -134,23 +140,23 @@ switch(lockout_currentState) {
 // This test uses the interval timer to determine correct delay for
 // the interval timer.
 bool lockoutTimer_runTest() {
-  printf("running lockoutTimer_runTest()\n");
+  printf(START_LOCKOUT_TIMER);
   lockoutTimer_init();
 
+//if the timer index is acceptable
   if (intervalTimer_init(INTERVAL_TIMER_INDEX) == INTERVAL_TIMER_STATUS_OK) {
     intervalTimer_reset(INTERVAL_TIMER_INDEX);
     intervalTimer_start(INTERVAL_TIMER_INDEX);
     lockoutTimer_start();
+    //continuous loop to keep test running while enabled
     while (lockoutTimer_running()) {
     }
     intervalTimer_stop(INTERVAL_TIMER_INDEX);
-    //printf("tickCounter: %d\n", lockoutTimer_tickCounter);
     double intervalTimerValue =
         intervalTimer_getTotalDurationInSeconds(INTERVAL_TIMER_INDEX);
-    printf("Lockout Timer Test: %f seconds\n", intervalTimerValue);
+    printf(LOCKOUT_TIMER_VALUE, intervalTimerValue);
   } else {
-    printf("failed to initialize intervalTimer 0\n");
+    printf(LOCKOUT_TIMER_FAIL);
   }
 }
 
-#endif /* LOCKOUTTIMER_H_ */
