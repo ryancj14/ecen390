@@ -12,19 +12,29 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #include <stdbool.h>
 #include <time.h>
 #include "utils.h"
+#include <stdio.h>
+#include "intervalTimer.h"
 
 #include "lockoutTimer.h"
 
+#define ERROR_MSG "Lockout Timer Error\n"
+#define INIT_ST_MSG "Init st\n"
+#define WAIT_ST_MSG "Wait state\n"
+#define RUN_ST_MSG "Run state\n"
+
+#define INTERVAL_TIMER_INDEX 1
+#define INTERVAL_TIMER_STATUS_OK 1
+
 #define LED_CYCLES 50000 //half a second
 uint32_t static cycleCounter;
-
+static bool debugPrint;
 #define LOCKOUT_TIMER_EXPIRE_VALUE 50000 // Defined in terms of 100 kHz ticks.
 
 enum lockoutTimer_st_t {
     init_st,
 	wait_st,
     run_st
-} currentState;
+} lockout_currentState;
 
 volatile static bool timerStartFlag = false;
 
@@ -33,11 +43,11 @@ void lockoutTimer_debugStatePrint() {
   static bool firstPass = true;
   // Only print the message if:
   // 1. This the first pass and the value for previousState is unknown.
-  // 2. previousState != currentState - this prevents reprinting the same state name over and over.
-  if (previousState != currentState || firstPass) {
+  // 2. previousState != lockout_currentState - this prevents reprinting the same state name over and over.
+  if (previousState != lockout_currentState || firstPass) {
     firstPass = false;                // previousState will be defined, firstPass is false.
-    previousState = currentState;     // keep track of the last state that you were in.
-    switch(currentState) {            // This prints messages based upon the state that you were in.
+    previousState = lockout_currentState;     // keep track of the last state that you were in.
+    switch(lockout_currentState) {            // This prints messages based upon the state that you were in.
       case init_st:
         printf(INIT_ST_MSG);
         break;
@@ -59,7 +69,7 @@ void lockoutTimer_start() {
 void lockoutTimer_init() {
     timerStartFlag = false;
     cycleCounter = 0;
-    currentState = init_st;
+    lockout_currentState = init_st;
 }
 
 // Returns true if the timer is running.
@@ -69,36 +79,39 @@ bool lockoutTimer_running() {
 
 // Standard tick function.
 void lockoutTimer_tick() {
-switch(currentState) {
+  if(debugPrint)
+    lockoutTimer_debugStatePrint();
+switch(lockout_currentState) {
       case init_st:
-        currentState = wait_st;
+        lockout_currentState = wait_st;
         break;
       case wait_st:
         if(timerStartFlag) {
             cycleCounter = 0;
-            currentState = run_st;
+            lockout_currentState = run_st;
         }
         else {
-            currentState = wait_st;
+            lockout_currentState = wait_st;
         }
         break;
       case run_st:
         if(cycleCounter > LED_CYCLES) {
-            cycleCounter = 0;
-            currentState = wait_st;
+            lockout_currentState = wait_st;
+            timerStartFlag = false;
         }
         else {
-            currentState = run_st;
+            lockout_currentState = run_st;
         }
         break;
     default:
         printf(ERROR_MSG);
+        printf("Current state in Lockout: %d\n", lockout_currentState);
       // print an error message here.
       break;
   }
   
   // Perform state action next.
-  switch(currentState) {
+  switch(lockout_currentState) {
       case init_st:
         break;
       case wait_st:
@@ -121,15 +134,23 @@ switch(currentState) {
 // This test uses the interval timer to determine correct delay for
 // the interval timer.
 bool lockoutTimer_runTest() {
-    lockoutTimer_init();
-    clock_t before = clock();
+  printf("running lockoutTimer_runTest()\n");
+  lockoutTimer_init();
+
+  if (intervalTimer_init(INTERVAL_TIMER_INDEX) == INTERVAL_TIMER_STATUS_OK) {
+    intervalTimer_reset(INTERVAL_TIMER_INDEX);
+    intervalTimer_start(INTERVAL_TIMER_INDEX);
     lockoutTimer_start();
-
-        while(lockoutTimer_isRunning()) {
-            
-        }
-    printf("Time difference: %d\n", clock() - before);
-
+    while (lockoutTimer_running()) {
+    }
+    intervalTimer_stop(INTERVAL_TIMER_INDEX);
+    //printf("tickCounter: %d\n", lockoutTimer_tickCounter);
+    double intervalTimerValue =
+        intervalTimer_getTotalDurationInSeconds(INTERVAL_TIMER_INDEX);
+    printf("Lockout Timer Test: %f seconds\n", intervalTimerValue);
+  } else {
+    printf("failed to initialize intervalTimer 0\n");
+  }
 }
 
 #endif /* LOCKOUTTIMER_H_ */

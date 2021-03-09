@@ -10,9 +10,11 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #ifndef LEDTIMER_H_
 #define LEDTIMER_H_
 
+#include "mio.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include "utils.h"
+#include <stdio.h>
 
 #include "ledTimer.h"
 
@@ -20,10 +22,11 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #define LEDTIMER_LOW_VALUE 0
 #define LEDTIMER_OUTPUT_PIN 11    
 
+
 #define INIT_ST_MSG "Init state\n"
 #define WAIT_ST_MSG "Wait state\n"
 #define LIT_ST_MSG "Lit state\n"
-#define ERROR_MSG "Error occurred\n"
+#define ERROR_MSG "LED Timer Error occurred\n"
 
 // Provides an led timer with adjustable frequency and adjustable on/off times.
 // All time-based numbers are expressed in milliseconds.
@@ -34,18 +37,21 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #define LED_TIMER_LED_PIN 15 // This is the MIO pin number.
 #define LED_CYCLES 50000 //half a second
 
+static bool debugPrint;
 volatile static bool timerStartFlag = false;
 uint32_t static cycleCounter;
 enum ledTimer_st_t {
     init_st,
 	wait_st,
     lit_st
-} currentState;
+} led_currentState;
 
 // Initialize the ledTimer before you use it.
 void ledTimer_init() {
-currentState = init_st;
+  mio_init(false);
+led_currentState = init_st;
 cycleCounter = 0;
+mio_setPinAsOutput(LEDTIMER_OUTPUT_PIN);
 }
 
 void ledTimer_debugStatePrint() {
@@ -53,11 +59,11 @@ void ledTimer_debugStatePrint() {
   static bool firstPass = true;
   // Only print the message if:
   // 1. This the first pass and the value for previousState is unknown.
-  // 2. previousState != currentState - this prevents reprinting the same state name over and over.
-  if (previousState != currentState || firstPass) {
+  // 2. previousState != led_currentState - this prevents reprinting the same state name over and over.
+  if (previousState != led_currentState || firstPass) {
     firstPass = false;                // previousState will be defined, firstPass is false.
-    previousState = currentState;     // keep track of the last state that you were in.
-    switch(currentState) {            // This prints messages based upon the state that you were in.
+    previousState = led_currentState;     // keep track of the last state that you were in.
+    switch(led_currentState) {            // This prints messages based upon the state that you were in.
       case init_st:
         printf(INIT_ST_MSG);
         break;
@@ -112,38 +118,41 @@ void ledTimer_controlHitLed(bool flag) {
 
 // Standard state-machine tick function. Call this to advance the state machine.
 void ledTimer_tick() {
-switch(currentState) {
+  if(debugPrint)
+    ledTimer_debugStatePrint();
+switch(led_currentState) {
       case init_st:
-        currentState = wait_st;
+        led_currentState = wait_st;
         break;
       case wait_st:
         if(timerStartFlag) {
             cycleCounter = 0;
-            currentState = lit_st;
-            mio_writePin(TRANSMITTER_OUTPUT_PIN, TRANSMITTER_HIGH_VALUE); // Write a '1' to JF-1.
+            led_currentState = lit_st;
+            mio_writePin(LEDTIMER_OUTPUT_PIN, LEDTIMER_HIGH_VALUE); // Write a '1' to JF-1.
         }
         else {
-            currentState = wait_st;
+            led_currentState = wait_st;
         }
         break;
       case lit_st:
         if(cycleCounter > LED_CYCLES) {
             cycleCounter = 0;
-            currentState = wait_st;
-            mio_writePin(TRANSMITTER_OUTPUT_PIN, TRANSMITTER_LOW_VALUE); // Write a '1' to JF-1.
+            led_currentState = wait_st;
+            mio_writePin(LEDTIMER_OUTPUT_PIN, LEDTIMER_LOW_VALUE); // Write a '1' to JF-1.
         }
         else {
-            currentState = lit_st;
+            led_currentState = lit_st;
         }
         break;
     default:
         printf(ERROR_MSG);
+        printf("Current state in LED: %d\n", led_currentState);
       // print an error message here.
       break;
   }
   
   // Perform state action next.
-  switch(currentState) {
+  switch(led_currentState) {
       case init_st:
         break;
       case wait_st:
@@ -161,7 +170,7 @@ switch(currentState) {
 
 // Standard test function.
 void ledTimer_runTest() {
-    ledTimer_init();
+  debugPrint = true;
 while(true) {
     ledTimer_start();
         while(ledTimer_isRunning()) {

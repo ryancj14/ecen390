@@ -11,6 +11,10 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #define ISR_H_
 #include <stdint.h>
 
+#include "trigger.h"
+#include "ledTimer.h"
+#include "lockoutTimer.h"
+#include "transmitter.h"
 #include "isr.h"
 
 typedef uint32_t
