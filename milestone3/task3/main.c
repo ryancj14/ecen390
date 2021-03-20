@@ -28,7 +28,7 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 // #define RUNNING_MODES_TWO_TEAMS
 
 // Leave uncommented to run continuous/shooter mode.
-// #define DEFAULT_RUNNING_MODE
+#define DEFAULT_RUNNING_MODE
 
 // The following line enables the main() contained in laserTagMain.c
 // Leave this line uncommented unless you want to run some other special test
@@ -78,7 +78,7 @@ int main() {
     printf("Starting continuous mode\n\r");
     runningModes_continuous(); // Otherwise, go to continuous mode.
   }
-  detector_runTest();
+  // detector_runTest();
 #endif
 }
 

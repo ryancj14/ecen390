@@ -37,7 +37,7 @@ typedef uint32_t detector_status_t;   // Used to return status from tests.
 #define FREQ_SIZE 10
 #define POWER_SIZE 10
 
-#define FUDGE_FACTOR 1000
+#define FUDGE_FACTOR 100
 #define MEDIAN_INDEX 5
 typedef uint16_t detector_hitCount_t;
 
@@ -49,6 +49,8 @@ static double hitTestValues[POWER_SIZE] = {8.0, 7.0, 6.0,    5.0, 3.0,
                                            1.0, 2.5, 8000.0, 3.0, 10.0};
 static double missTestValues[POWER_SIZE] = {1.0, 1.0, 1.0,  1.0, 1.0,
                                             1.0, 1.0, 10.0, 3.0, 4.0};
+
+static bool debugPrint;
 static uint32_t fudgeFactor;
 static double powerArray[POWER_SIZE];
 static uint32_t detector_hitArray[POWER_SIZE];
@@ -63,8 +65,8 @@ static bool ignoreFreq[POWER_SIZE] = {false, false, false, false, false,
 // bool array is indexed by frequency number, array location set for true to
 // ignore, false otherwise. This way you can ignore multiple frequencies.
 void detector_init(bool ignoredFrequencies[]) {
-
   fudgeFactor = FUDGE_FACTOR;
+  debugPrint = false;
   lastFrequency = 0;
   ignoreHitsFlag = false;
   sampleCount = 0;
@@ -77,44 +79,17 @@ void detector_init(bool ignoredFrequencies[]) {
   }
 }
 
+void detector_debugPrint() {
+  for (uint32_t i = 0; i < POWER_SIZE; i++) {
+    printf("Power value at %d: %f\n", i, powerArray[i]);
+  }
+}
 // Encapsulate ADC scaling for easier testing.
 double detector_getScaledAdcValue(isr_AdcValue_t adcValue) {
   return (adcValue / (2047.5)) - 1;
 }
 // Returns true if a hit was detected.
-bool detector_hitDetected() {
-  if (!ignoreHitsFlag) {
-    double arrayIndices[POWER_SIZE] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    // for (uint32_t i = 0; i < POWER_SIZE; i++) {
-    //   printf("Power array before sort at %d: %f\n", i, powerArray[i]);
-    // }
-    detector_sort(&lastFrequency, powerArray, arrayIndices);
-    double median = powerArray[(uint32_t)(arrayIndices[MEDIAN_INDEX])];
-    double threshold = median * FUDGE_FACTOR;
-    // printf("Median: %f\n", median);
-    // printf("Fudge factor: %d\n", FUDGE_FACTOR);
-    // printf("Threshold: %f\n", threshold);
-    if (powerArray[(uint32_t)(arrayIndices[HIGH_INDEX])] > threshold) {
-      lastFrequency = arrayIndices[HIGH_INDEX];
-      //   if (testOne) {
-      //     printf("Test one succeeded\n");
-      //   } else if (testTwo) {
-      //     printf("Test two failed\n");
-      //   }
-      return true;
-    } else {
-      //   if (testTwo) {
-      //     printf("Test two succeeded\n");
-      //   } else if (testOne) {
-      //     printf("Test one failed\n");
-      //   }
-      return false;
-    }
-  } else {
-    printf("Ignoring hits\n");
-    return false;
-  }
-}
+bool detector_hitDetected() { return hitDetectedFlag; }
 // Returns the frequency number that caused the hit.
 uint16_t detector_getFrequencyNumberOfLastHit() { return lastFrequency; }
 
@@ -130,7 +105,7 @@ uint16_t detector_getFrequencyNumberOfLastHit() { return lastFrequency; }
 // Your frequency is simply the frequency indicated by the slide switches
 void detector(bool interruptsCurrentlyEnabled) {
   uint32_t elementCount = isr_adcBufferElementCount();
-  printf("Element count: %d\n", elementCount);
+  // printf("Element count: %d\n", elementCount);
   if (testOne || testTwo) {
     elementCount = 1;
   }
@@ -138,7 +113,9 @@ void detector(bool interruptsCurrentlyEnabled) {
     if (interruptsCurrentlyEnabled) {
       interrupts_disableArmInts();
     }
+    // printf("Removing data\n");
     uint32_t rawAdcValue = isr_removeDataFromAdcBuffer();
+    // printf("Raw value: %d\n", rawAdcValue);
     if (interruptsCurrentlyEnabled) {
       interrupts_enableArmInts();
     }
@@ -165,24 +142,32 @@ void detector(bool interruptsCurrentlyEnabled) {
               false); // Compute the power for each of the IIR filters.
         }
       }
+      // maybe adc is running too fast?
       // printf("Before detection\n");
 
       //   for (uint32_t i = 0; i < POWER_SIZE; i++) {
       //     printf("Power array at %d: %f\n", i, powerArray[i]);
       //   }
-      bool wasHit = false;
       if (!lockoutTimer_running()) {
-        wasHit = detector_hitDetected();
-        // printf("Was hit: %d\n", wasHit);
-        if (wasHit &&
+        if (!ignoreHitsFlag) {
+          double arrayIndices[POWER_SIZE] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+          detector_sort(&lastFrequency, powerArray, arrayIndices);
+          double median = powerArray[(uint32_t)(arrayIndices[MEDIAN_INDEX])];
+          double threshold = median * FUDGE_FACTOR;
+          if (powerArray[(uint32_t)(arrayIndices[HIGH_INDEX])] > threshold) {
+            lastFrequency = arrayIndices[HIGH_INDEX];
+            hitDetectedFlag = true;
+          }
+        }
+        // printf("Was hit: %d\n", hitDetectedFlag);
+        if (hitDetectedFlag &&
             !ignoreFrequency[detector_getFrequencyNumberOfLastHit()]) {
           if (!(testOne || testTwo)) {
             lockoutTimer_start();
           }
-          printf("Incrementing array\n");
+          // printf("Incrementing array\n");
           hitLedTimer_start();
           detector_hitArray[detector_getFrequencyNumberOfLastHit()]++;
-          hitDetectedFlag = true;
         }
       }
     }
@@ -202,7 +187,7 @@ void detector_ignoreAllHits(bool flagValue) { ignoreHitsFlag = true; }
 // using a for-loop.
 void detector_getHitCounts(detector_hitCount_t hitArray[]) {
   for (uint32_t i = 0; i < POWER_SIZE; i++) {
-    detector_hitArray[i] = hitArray[i];
+    hitArray[i] = detector_hitArray[i];
   }
 }
 

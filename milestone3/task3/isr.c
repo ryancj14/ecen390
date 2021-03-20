@@ -15,6 +15,7 @@ For questions, contact Brad Hutchings or Jeff Goeders, https://ece.byu.edu/
 #include "lockoutTimer.h"
 #include "transmitter.h"
 #include "trigger.h"
+#include <stdio.h>
 
 // Uses interval timer 0 to measure time spent in ISR.
 #define ENABLE_INTERVAL_TIMER_0_IN_TIMER_ISR 1
@@ -64,6 +65,7 @@ void isr_function() {
 // This adds data to the ADC queue. Data are removed from this queue and used by
 // the detector.
 void isr_addDataToAdcBuffer(uint32_t adcData) {
+  // printf("Add data to adc buffer func\n");
   if (queueSize < ADC_BUFFER_SIZE) {
     queue.data[queue.indexIn] = adcData;
     queue.indexIn++;
@@ -76,16 +78,22 @@ void isr_addDataToAdcBuffer(uint32_t adcData) {
 
 // This removes a value from the ADC buffer.
 uint32_t isr_removeDataFromAdcBuffer() {
-  uint32_t returnValue = queue.data[queue.indexOut];
+  // printf("Remove data from adc func\n");
   if (queueSize > 0) {
+    uint32_t returnValue = queue.data[queue.indexOut];
     queue.indexOut++;
     queueSize--;
     if (queue.indexOut >= ADC_BUFFER_SIZE) {
       queue.indexOut = 0;
     }
+    return returnValue;
+  } else {
+    return 0;
   }
-  return returnValue;
 }
 
 // This returns the number of values in the ADC buffer.
-uint32_t isr_adcBufferElementCount() { return queueSize; }
+uint32_t isr_adcBufferElementCount() {
+  // printf("Element count: %d\n", queueSize);
+  return queueSize;
+}
