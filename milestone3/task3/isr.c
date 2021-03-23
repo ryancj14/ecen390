@@ -53,6 +53,7 @@ void adcBufferInit() {
 void isr_init() {
   adcBufferInit(); // init the local adcBuffer.
 }
+
 // This function is invoked by the timer interrupt at 100 kHz.
 void isr_function() {
   transmitter_tick();
@@ -65,7 +66,6 @@ void isr_function() {
 // This adds data to the ADC queue. Data are removed from this queue and used by
 // the detector.
 void isr_addDataToAdcBuffer(uint32_t adcData) {
-  // printf("Add data to adc buffer func\n");
   if (queueSize < ADC_BUFFER_SIZE) {
     queue.data[queue.indexIn] = adcData;
     queue.indexIn++;
@@ -78,7 +78,6 @@ void isr_addDataToAdcBuffer(uint32_t adcData) {
 
 // This removes a value from the ADC buffer.
 uint32_t isr_removeDataFromAdcBuffer() {
-  // printf("Remove data from adc func\n");
   if (queueSize > 0) {
     uint32_t returnValue = queue.data[queue.indexOut];
     queue.indexOut++;
@@ -93,7 +92,4 @@ uint32_t isr_removeDataFromAdcBuffer() {
 }
 
 // This returns the number of values in the ADC buffer.
-uint32_t isr_adcBufferElementCount() {
-  // printf("Element count: %d\n", queueSize);
-  return queueSize;
-}
+uint32_t isr_adcBufferElementCount() { return queueSize; }
